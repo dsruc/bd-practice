@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  db:
+    image: postgres:15
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: company_db
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_started
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+  api:
+    image: python:3.11-slim
+    container_name: api_service
+    volumes:
+      - ./api:/app
+    working_dir: /app
+    command: [ "sleep", "infinity" ]
+    depends_on:
+      db:
+        condition: service_started
+
+volumes:
+  db_data:
+  pgadmin_data:
