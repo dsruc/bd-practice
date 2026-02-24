@@ -1,45 +1,59 @@
 version: '3.9'
 
 services:
+
   db:
     image: postgres:15
-    container_name: postgres_db
+    container_name: postgres_secure
     restart: unless-stopped
+    user: postgres
+    env_file: .env
     environment:
-      POSTGRES_USER: app_user
-      POSTGRES_PASSWORD: app_password
-      POSTGRES_DB: company_db
+      POSTGRES_INITDB_ARGS: "--auth-local=scram-sha-256"
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+      - ./db/backup:/backup
+    networks:
+      - backend_net
     ports:
       - "5432:5432"
 
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: pgadmin
+  api:
+    build: ./api
+    container_name: api_service
     restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "8080:80"
+    env_file: .env
     depends_on:
       db:
         condition: service_started
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-
-  api:
-    image: python:3.11-slim
-    container_name: api_service
     volumes:
       - ./api:/app
+    networks:
+      - backend_net
+    ports:
+      - "8000:8000"
+
+  streamlit:
+    image: python:3.11-slim
+    container_name: streamlit_ui
     working_dir: /app
-    command: [ "sleep", "infinity" ]
+    volumes:
+      - ./streamlit:/app
+      - ./api:/app/api
+    env_file:
+      - .env
+    command: bash -c "pip install -r requirements.txt && streamlit run streamlit_app.py --server.address=0.0.0.0"
+    ports:
+      - "8501:8501"
     depends_on:
-      db:
-        condition: service_started
+      - db
+    networks:
+      - backend_net
+
+
+networks:
+  backend_net:
 
 volumes:
   db_data:
-  pgadmin_data:
